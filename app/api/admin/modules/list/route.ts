@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
-import { loadManifestsWithRegistry } from "@/lib/modules";
+import { listInstalledModules } from "@/lib/modules";
 
 function parseCookies(cookieHeader: string | null) {
   const map: Record<string, string> = {};
@@ -26,8 +26,8 @@ async function verifyAdmin(req: Request) {
   const server = createServerClient(SUPA_URL, SUPA_ANON, {
     cookies: {
       get: (n: string) => cookies[n],
-      set: () => {},
-      remove: () => {},
+      set: () => { },
+      remove: () => { },
     },
   });
 
@@ -56,12 +56,10 @@ export async function GET(req: Request) {
   try {
     await verifyAdmin(req);
 
-    const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-    const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-    if (!SUPA_URL || !SERVICE) throw new Error("Supabase envs not configured");
+    // No need for Supabase client here anymore for listing modules
+    // const srv = createClient(SUPA_URL, SERVICE); 
 
-    const srv = createClient(SUPA_URL, SERVICE);
-    const modules = await loadManifestsWithRegistry(srv);
+    const modules = await listInstalledModules();
 
     return NextResponse.json({ ok: true, modules });
   } catch (err: any) {

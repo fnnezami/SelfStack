@@ -3,7 +3,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
-import { loadManifestsWithRegistry } from "@/lib/modules";
+
 import fs from "fs/promises";
 import path from "path";
 import React from "react";
@@ -30,9 +30,9 @@ async function loadBuiltinAdminPages() {
             name: name.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
             href: `/admin/${encodeURIComponent(name)}`,
           });
-      } catch {}
+      } catch { }
     }
-  } catch {}
+  } catch { }
   pages.sort((a, b) => a.name.localeCompare(b.name));
   return pages;
 }
@@ -69,7 +69,7 @@ export default async function AdminHome(props: { searchParams?: any }) {
 
   const jar = await cookies();
   const anon = createServerClient(SUPA_URL, SUPA_ANON, {
-    cookies: { get: (n) => jar.get(n)?.value, set() {}, remove() {} },
+    cookies: { get: (n) => jar.get(n)?.value, set() { }, remove() { } },
   });
 
   const {
@@ -105,13 +105,13 @@ export default async function AdminHome(props: { searchParams?: any }) {
   const builtin = await loadBuiltinAdminPages();
   let dynamicModules: Array<{ id: string; name?: string; adminPath?: string; installed?: boolean; enabled?: boolean }> = [];
   try {
-    const srv = SERVICE ? createClient(SUPA_URL, SERVICE) : undefined;
-    const mods = await loadManifestsWithRegistry(srv as any);
+    const { listInstalledModules } = await import("@/lib/modules");
+    const mods = await listInstalledModules();
     dynamicModules = mods.map((m: any) => ({
       id: m.id,
       name: m.name,
       adminPath: m.adminPath,
-      installed: m.installed,
+      installed: true,
       enabled: m.enabled,
     }));
   } catch {

@@ -1,15 +1,15 @@
 import React from "react";
 import { notFound } from "next/navigation";
-import { loadManifestsWithRegistry } from "@/lib/modules";
+
 import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export default async function ModulePublicPage({ 
-  params 
-}: { 
-  params: Promise<{ path: string[] }> 
+export default async function ModulePublicPage({
+  params
+}: {
+  params: Promise<{ path: string[] }>
 }) {
   const { path: segments } = await params;
   const segs = segments ?? [];
@@ -21,11 +21,9 @@ export default async function ModulePublicPage({
   // resolve manifest
   let manifest: any = null;
   try {
-    const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-    const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-    const srv = SUPA_URL && SERVICE ? createClient(SUPA_URL, SERVICE) : undefined;
-    const all = await loadManifestsWithRegistry(srv as any);
-    manifest = all.find((m: any) => m.id === moduleId && m.enabled) || null;
+    const { getModuleById } = await import("@/lib/modules");
+    const m = await getModuleById(moduleId);
+    if (m && m.enabled) manifest = m;
   } catch {
     manifest = null;
   }

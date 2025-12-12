@@ -8,10 +8,10 @@ export async function GET(req: Request) {
   try {
     // If you want to pass service client (to merge registry), create it from env
     const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-    const SERVICE  = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+    const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
     const srv = SUPA_URL && SERVICE ? createClient(SUPA_URL, SERVICE) : undefined;
 
-    const mods = await getEnabledFloatingModules(srv as any);
+    const mods = await getEnabledFloatingModules();
     const safe = mods.map((m: any) => ({
       id: m.id,
       name: m.name,

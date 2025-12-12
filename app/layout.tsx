@@ -7,7 +7,7 @@ import Navbar from "@/components/Navbar";
 import { fetchNormalizedResume } from "@/lib/gist";
 import FloatingModulesHost from "@/components/FloatingModulesHost";
 import FloatingModulesServer from "./components/FloatingModules.server";
-import { loadManifestsWithRegistry } from "@/lib/modules";
+
 import { createClient } from "@supabase/supabase-js";
 import ThemeToggle from "./components/ThemeToggle.client";
 import { cookies } from "next/headers";
@@ -49,10 +49,8 @@ export default async function RootLayout({
   // load enabled "page" modules and pass to Navbar
   let pageModules: any[] = [];
   try {
-    const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-    const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-    const srv = SUPA_URL && SERVICE ? createClient(SUPA_URL, SERVICE) : undefined;
-    const all = await loadManifestsWithRegistry(srv as any);
+    const { listInstalledModules } = await import("@/lib/modules");
+    const all = await listInstalledModules();
     pageModules = Array.isArray(all) ? all.filter((m: any) => m.kind === "page" && m.enabled) : [];
   } catch {
     pageModules = [];
@@ -123,7 +121,7 @@ export default async function RootLayout({
             summary={typeof basics?.summary === "string" ? basics.summary : ""}
             photoUrl={typeof basics?.image === "string" ? basics.image : undefined}
             links={links}
-            // Tighten summary block to prevent tall header feel
+          // Tighten summary block to prevent tall header feel
           />
         </div>
 

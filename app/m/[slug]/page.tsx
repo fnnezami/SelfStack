@@ -39,7 +39,7 @@ export default async function ModulePage(props: { params?: any }) {
       const posts = await listPublished();
       return (
         <div className="mx-auto max-w-3xl px-4 py-8">
-          <h1 className="text-2xl font-semibold">{mod.manifest?.name || mod.id}</h1>
+          <h1 className="text-2xl font-semibold">{mod.name || mod.id}</h1>
           <div className="space-y-6 mt-6">
             {posts.map((p: any) => (
               <article key={p.slug} className="border rounded-md p-4 bg-white">

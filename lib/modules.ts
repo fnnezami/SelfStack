@@ -1,133 +1,49 @@
-import { createClient } from "@supabase/supabase-js";
 import fs from "fs/promises";
 import path from "path";
 
-export async function loadManifestsWithRegistry(
-  srv?: any,
-  opts?: { includeDisabled?: boolean }
-) {
-  const includeDisabled = !!opts?.includeDisabled;
-
-  // Client-side: proxy to server API (keeps browser bundle clean)
-  if (typeof window !== "undefined") {
-    const q = includeDisabled ? "?includeDisabled=1" : "";
-    const res = await fetch(`/api/modules/registry${q}`, { cache: "no-store" });
-    if (!res.ok) return [];
-    try {
-      return (await res.json()) || [];
-    } catch {
-      return [];
-    }
-  }
-
-  // Server-side: read modules from DB only (no fs)
-  try {
-    // require here to avoid bundling server-only code into client build
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { createClient } = require("@supabase/supabase-js");
-
-    const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-    const SERVICE_KEY =
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "";
-
-    const client = srv || (SUPA_URL && SERVICE_KEY ? createClient(SUPA_URL, SERVICE_KEY) : null);
-    if (!client) return [];
-
-    const { data, error } = await client.from("modules").select("*");
-    if (error || !Array.isArray(data)) return [];
-
-    const list = data;
-    if (includeDisabled) return list;
-    return list.filter((m: any) => m.enabled !== false);
-  } catch {
-    return [];
-  }
+// Unified Type Definition
+export interface ModuleManifest {
+  id: string;
+  name?: string;
+  description?: string;
+  kind?: string;
+  config?: any;
+  enabled?: boolean;
+  slug?: string;
+  [key: string]: any;
 }
 
-// server helpers
-export async function getEnabledFloatingModules(srv?: any) {
-  const all = await loadManifestsWithRegistry(srv);
-  return all.filter((m: any) => m.kind === "floating" && m.enabled !== false);
-}
+// === Core Filesystem Loader ===
 
-export async function getPageModuleBySlug(slug: string) {
-  const modules = await listInstalledModules(); // existing loader
-  for (const m of modules) {
-    const rawPagePath = m.config?.pagePath || "";
-    const normalizedPagePath = rawPagePath.replace(/^\/+|\/+$/g, ""); // trim slashes
-    // candidate that used to be used (keep for backwards compatibility)
-    const candidate = normalizedPagePath || m.slug || m.id;
-
-    if (candidate === slug) return m;
-
-    // Minimal additions: also accept module id, module slug explicitly,
-    // and the basename of a configured pagePath (e.g. "/modules/blog-posts/public" -> "blog-posts")
-    if (m.id === slug) return m;
-    if (m.slug && m.slug === slug) return m;
-
-    if (normalizedPagePath) {
-      const base = path.posix.basename(normalizedPagePath);
-      if (base === slug) return m;
-    }
-  }
-  return null;
-}
-
-export async function loadModuleManifest(id: string, srv?: any) {
-  if (!id) return null;
-  // try registry / DB first (includeDisabled so not-yet-enabled modules are found)
-  try {
-    const all = await loadManifestsWithRegistry(srv as any, { includeDisabled: true });
-    const found = (all || []).find((m: any) => String(m.id) === String(id) || String(m.name) === String(id));
-    if (found) return found;
-  } catch {
-    // ignore
-  }
-
-  // server-side fallback: try reading modules/<id>/manifest.json
-  if (typeof window === "undefined") {
-    try {
-      // require here to avoid bundling server-only code
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const fs = require("fs");
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const path = require("path");
-
-      const mpath = path.join(process.cwd(), "modules", String(id), "manifest.json");
-      if (fs.existsSync(mpath)) {
-        const raw = fs.readFileSync(mpath, "utf8");
-        const mf = JSON.parse(raw);
-        return { ...mf, id: mf.id || id, enabled: mf.enabled !== false, _source: "disk" };
-      }
-    } catch {
-      // ignore
-    }
-  }
-
-  return null;
-}
-
-// Minimal runtime listInstalledModules used by getPageModuleBySlug and other lookups.
-// Returns an array of modules with { id, slug, config, manifest }.
-export async function listInstalledModules() {
+/**
+ * Lists all modules found in the `modules/` directory with a valid `manifest.json`.
+ * This is the SOURCE OF TRUTH for what code is available to run.
+ */
+export async function listInstalledModules(): Promise<ModuleManifest[]> {
   const modulesRoot = path.join(process.cwd(), "modules");
   try {
+    // Ensure dir exists
+    await fs.access(modulesRoot).catch(() => null);
+    
     const dirents = await fs.readdir(modulesRoot, { withFileTypes: true });
-    const dirs = dirents.filter(d => d.isDirectory()).map(d => d.name);
-    const result: Array<{ id: string; slug?: string; config?: any; manifest?: any }> = [];
+    // Filter for directories
+    const dirs = dirents.filter((d) => d.isDirectory()).map((d) => d.name);
+
+    const result: ModuleManifest[] = [];
+
     for (const id of dirs) {
       const manifestPath = path.join(modulesRoot, id, "manifest.json");
       try {
         const content = await fs.readFile(manifestPath, "utf8");
         const manifest = JSON.parse(content);
-        result.push({
-          id,
-          slug: manifest.slug || id,
-          config: manifest.config || {},
-          manifest,
-        });
+        
+        // Ensure critical fields
+        manifest.id = manifest.id || id;
+        manifest.enabled = manifest.enabled !== false; // Default to true if missing
+        
+        result.push(manifest);
       } catch (err) {
-        // skip entries without a valid manifest
+        // Skip invalid/missing manifests silently or log if needed
         continue;
       }
     }
@@ -136,3 +52,56 @@ export async function listInstalledModules() {
     return [];
   }
 }
+
+/**
+ * Gets a specific module by its ID from the filesystem.
+ */
+export async function getModuleById(id: string): Promise<ModuleManifest | null> {
+  if (!id) return null;
+  const list = await listInstalledModules();
+  return list.find((m) => m.id === id) || null;
+}
+
+// === Page Routing Helpers ===
+
+/**
+ * Finds a module responsible for a given slug.
+ * Prioritizes: Exact Slug Match > ID Match > PagePath Basename Match
+ */
+export async function getPageModuleBySlug(slug: string): Promise<ModuleManifest | null> {
+  const modules = await listInstalledModules();
+  
+  for (const m of modules) {
+    if (m.enabled === false) continue; // Skip disabled modules
+
+    // 1. Check explicit slug from manifest
+    if (m.slug && m.slug === slug) return m;
+
+    // 2. Check Module ID
+    if (m.id === slug) return m;
+
+    // 3. Check legacy/config-based Page Path basename
+    // e.g. config: { pagePath: "/modules/blog-posts/public" } -> matches slug "blog-posts"
+    const rawPagePath = m.config?.pagePath || "";
+    if (rawPagePath) {
+        const normalized = rawPagePath.replace(/^\/+|\/+$/g, "");
+        const base = path.posix.basename(normalized);
+        if (base === slug) return m;
+    }
+  }
+  return null;
+}
+
+// === Server/DB Utilities (Optional Metadata) ===
+
+/**
+ * Helper to get currently enabled "floating" modules (widgets etc).
+ */
+export async function getEnabledFloatingModules() {
+  const modules = await listInstalledModules();
+  return modules.filter((m) => m.kind === "floating" && m.enabled !== false);
+}
+
+// Backward compatibility / Alias for consumers expecting this function
+export const loadModuleManifest = getModuleById;
+
