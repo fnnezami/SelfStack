@@ -1,0 +1,31 @@
+
+import { spawn } from "child_process";
+import http from "http";
+
+async function run() {
+  console.log("Starting Next.js in SERVERLESS mode...");
+  
+  const server = spawn("npm", ["run", "start"], {
+    env: { ...process.env, IS_SERVERLESS: "true", PORT: "3001" },
+    shell: true,
+    stdio: "inherit"
+  });
+
+  // Give it some time to start (build might be needed first?) 
+  // actually 'npm run start' needs build. We assume build exists or we run dev. 
+  // 'next dev' is faster for quick check.
+}
+
+// Rewriting to just fetch against running dev server if possible, 
+// BUT we need to inject the IS_SERVERLESS env var.
+// So we must restart it.
+
+// Simpler approach: Unit test style logic or just direct invoke? 
+// We can't easily unit test Next.js API routes without mocking.
+// Let's rely on manual confirmation or a simple script that user can run? 
+// No, I should run it.
+
+// I will try to run a small independent node script that just IMPORTS the route handlers?
+// That might fail due to Next.js internals (NextResponse etc).
+
+// Okay, I'll run `next dev` with IS_SERVERLESS=true in background, wait for it, curl it, then kill it.

@@ -59,7 +59,17 @@ async function verifyAdmin(req: Request) {
   return allow.includes(email);
 }
 
+
+import { isServerless } from "@/lib/utils";
+
 export async function POST(req: Request) {
+  if (isServerless()) {
+    return NextResponse.json(
+      { error: "Module installation is not available in serverless mode. Please install locally and commit." },
+      { status: 403 }
+    );
+  }
+
   try {
     const ok = await verifyAdmin(req);
     if (!ok) return NextResponse.json({ error: "forbidden" }, { status: 403 });

@@ -2,7 +2,17 @@ import { NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
 
+
+import { isServerless } from "@/lib/utils";
+
 export async function POST(req: Request) {
+  if (isServerless()) {
+    return NextResponse.json(
+      { ok: false, error: "Code editing is disabled in serverless production." },
+      { status: 403 }
+    );
+  }
+
   try {
     const body = await req.json();
     const { file, code } = body || {};

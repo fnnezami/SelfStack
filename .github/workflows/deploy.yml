@@ -71,8 +71,8 @@ jobs:
             # unpack what we just uploaded
             tar xzf /tmp/deploy/site.tar.gz
 
-            # if you need runtime deps only:
-            npm ci --omit=dev
+            # faster install (uses existing node_modules)
+            npm install --omit=dev --no-audit
 
             # restart your process manager
             pm2 startOrReload ecosystem.config.cjs --env production
