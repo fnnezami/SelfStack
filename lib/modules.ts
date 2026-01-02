@@ -13,6 +13,54 @@ export interface ModuleManifest {
   [key: string]: any;
 }
 
+const STATIC_MODULES: ModuleManifest[] = [
+  {
+    "id": "blog-posts",
+    "name": "Blog Posts",
+    "description": "Blog posts (page module). Self-contained public + admin APIs and admin UI.",
+    "kind": "page",
+    "adminPath": "/admin/modules/blog-posts",
+    "config": {
+      "pagePath": "/modules/blog-posts/public"
+    },
+    "migrations": [
+      "migrations/0001_create_blog_posts.sql"
+    ],
+    "installer": "install.js",
+    "uninstaller": "uninstall.js",
+    "enabled": true
+  },
+  {
+    "id": "analytics",
+    "slug": "analytics",
+    "title": "Site Analytics",
+    "description": "Tracks and visualizes views for pages, blogs, and projects.",
+    "version": "1.0.0",
+    "config": {
+      "pagePath": "/modules/analytics/public"
+    }
+  },
+  {
+    "id": "chat",
+    "name": "Floating Chat",
+    "kind": "floating",
+    "config": { "welcome": "Hi" },
+    "migrations": ["migrations/0001_create_chat_messages.sql"],
+    "installer": "install.js",
+    "uninstaller": "uninstall.js"
+  },
+  {
+    "id": "rest-tester",
+    "slug": "rest-tester",
+    "title": "REST API Tester",
+    "description": "Floating widget for testing REST API endpoints with full customization",
+    "version": "1.0.0",
+    "config": {
+      "widgetPath": "/modules/rest-tester/public/widget.js"
+    }
+  }
+];
+
 // === Core Filesystem Loader ===
 
 /**
@@ -24,7 +72,7 @@ export async function listInstalledModules(): Promise<ModuleManifest[]> {
   try {
     // Ensure dir exists
     await fs.access(modulesRoot).catch(() => null);
-    
+
     const dirents = await fs.readdir(modulesRoot, { withFileTypes: true });
     // Filter for directories
     const dirs = dirents.filter((d) => d.isDirectory()).map((d) => d.name);
@@ -36,20 +84,25 @@ export async function listInstalledModules(): Promise<ModuleManifest[]> {
       try {
         const content = await fs.readFile(manifestPath, "utf8");
         const manifest = JSON.parse(content);
-        
+
         // Ensure critical fields
         manifest.id = manifest.id || id;
         manifest.enabled = manifest.enabled !== false; // Default to true if missing
-        
+
         result.push(manifest);
       } catch (err) {
         // Skip invalid/missing manifests silently or log if needed
         continue;
       }
     }
+
+    // If fs found nothing (e.g. Vercel weirdness), try fallback
+    if (result.length === 0) return STATIC_MODULES;
+
     return result;
   } catch (err) {
-    return [];
+    console.warn("Module discovery failed, using static registry:", err);
+    return STATIC_MODULES;
   }
 }
 
@@ -70,7 +123,7 @@ export async function getModuleById(id: string): Promise<ModuleManifest | null> 
  */
 export async function getPageModuleBySlug(slug: string): Promise<ModuleManifest | null> {
   const modules = await listInstalledModules();
-  
+
   for (const m of modules) {
     if (m.enabled === false) continue; // Skip disabled modules
 
@@ -84,9 +137,9 @@ export async function getPageModuleBySlug(slug: string): Promise<ModuleManifest 
     // e.g. config: { pagePath: "/modules/blog-posts/public" } -> matches slug "blog-posts"
     const rawPagePath = m.config?.pagePath || "";
     if (rawPagePath) {
-        const normalized = rawPagePath.replace(/^\/+|\/+$/g, "");
-        const base = path.posix.basename(normalized);
-        if (base === slug) return m;
+      const normalized = rawPagePath.replace(/^\/+|\/+$/g, "");
+      const base = path.posix.basename(normalized);
+      if (base === slug) return m;
     }
   }
   return null;
