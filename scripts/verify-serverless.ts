@@ -1,10 +1,10 @@
 
 import { register } from 'tsconfig-paths';
-import { compilerOptions } from './tsconfig.json';
+import { compilerOptions } from '../tsconfig.json';
 import path from 'path';
 
 // Register paths for @/ alias
-const baseUrl = path.resolve(compilerOptions.baseUrl || '.');
+const baseUrl = path.resolve((compilerOptions as any).baseUrl || '.');
 register({
     baseUrl,
     paths: compilerOptions.paths
